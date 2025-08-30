@@ -24,8 +24,6 @@ interface WebhookPayload {
   latest_charge?: string;
 }
 
-// Helper pour récupérer les données de manière safe - DEPRECATED
-// Remplacé par l'utilisation directe de la SDK Stripe
 
 // Fonction pour extraire les données de paiement
 async function extractPaymentData(latestCharge: string): Promise<PaymentData | null> {
@@ -123,6 +121,7 @@ export async function POST(req: Request) {
     // Traitement selon la description
     const trimmedDescription = description.trim();
     let paymentData: PaymentData | null = null;
+    let subscriptionId: string | null = null;
     let flowType: string;
 
     // Si description vide ou "Subscription creation" -> on récupère les infos
@@ -158,6 +157,26 @@ export async function POST(req: Request) {
         );
       }
 
+      // Récupération des informations de subscription si invoice existe
+      if (paymentData.invoiceId) {
+        try {
+          const invoiceData = await stripe.invoices.retrieve(paymentData.invoiceId);
+          console.log("Données de la facture extraites:", {
+            subscription: invoiceData.parent?.subscription_details?.subscription,
+            invoice_id: invoiceData.id
+          });
+
+          // Le subscription ID se trouve directement dans invoiceData.parent?.subscription_details
+          const subscription = invoiceData.parent?.subscription_details?.subscription;
+          subscriptionId = typeof subscription === 'string' 
+            ? subscription 
+            : (typeof subscription === 'object' && subscription?.id) || null;
+
+        } catch (error) {
+          console.error("Erreur lors de la récupération de l'invoice:", error);
+        }
+      }
+
       console.log("Données extraites avec succès:", {
         prenom: paymentData.prenom,
         nom: paymentData.nom,
@@ -165,6 +184,7 @@ export async function POST(req: Request) {
         customerId: paymentData.customerId,
         invoiceId: paymentData.invoiceId,
         productDescription: paymentData.productDescription,
+        subscriptionId,
       });
 
     } else if (trimmedDescription === "Subscription update") {
@@ -192,6 +212,9 @@ export async function POST(req: Request) {
           id: paymentData.invoiceId,
           product_description: paymentData.productDescription,
         },
+        subscription: subscriptionId ? {
+          id: subscriptionId,
+        } : null,
         charge_id: latest_charge,
       } : {
         latest_charge,
