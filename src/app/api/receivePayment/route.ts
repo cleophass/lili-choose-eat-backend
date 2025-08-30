@@ -13,15 +13,14 @@ interface PaymentData {
   nom: string;
   email: string;
   customerId: string;
+  paymentIntentId: string;
   invoiceId: string;
   productDescription: string;
 }
 
 interface WebhookPayload {
-  payment_intent_id: string;
   event_type: string;
   description?: string;
-  customer_id?: string;
   latest_charge?: string;
 }
 
@@ -76,6 +75,7 @@ async function extractPaymentData(latestCharge: string): Promise<PaymentData | n
     return {
       prenom: prenomField?.text?.value || '',
       nom: nomField?.text?.value || '',
+      paymentIntentId,
       email,
       customerId: customerId || '',
       invoiceId,
@@ -93,15 +93,13 @@ export async function POST(req: Request) {
     // Parse et validation du body
     const body: WebhookPayload = await req.json();
     const {
-      payment_intent_id,
       event_type,
       description = '',
-      customer_id,
       latest_charge,
     } = body;
 
     // Validation des champs obligatoires
-    if (!payment_intent_id || !event_type) {
+    if (!event_type) {
       return NextResponse.json(
         { 
           success: false,
@@ -148,6 +146,7 @@ export async function POST(req: Request) {
       
       // Extraction des données de paiement
       paymentData = await extractPaymentData(latest_charge);
+      console.log("Données de paiement extraites:", paymentData);
 
       if (!paymentData) {
         return NextResponse.json(
@@ -182,7 +181,7 @@ export async function POST(req: Request) {
       message: "Payment webhook traité avec succès ✅",
       flow: flowType,
       data: paymentData ? {
-        payment_intent_id,
+        payment_intent_id: paymentData.paymentIntentId,
         customer: {
           id: paymentData.customerId,
           prenom: paymentData.prenom,
@@ -195,8 +194,6 @@ export async function POST(req: Request) {
         },
         charge_id: latest_charge,
       } : {
-        payment_intent_id,
-        customer_id,
         latest_charge,
       },
     });
