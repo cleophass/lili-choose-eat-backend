@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       );
     }
 
-    
+
 
     // Traitement selon la description
     const trimmedDescription = description.trim();

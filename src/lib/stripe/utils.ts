@@ -19,6 +19,7 @@ export async function extractSubscriptionId(latestCharge: string): Promise<strin
 
     // 2. Récupérer le Payment Intent
     const paymentIntentData = await stripe.paymentIntents.retrieve(paymentIntentId);
+    console.log("Payment Intent data retrieved:", paymentIntentData);
 
     // 3. Récupérer le customer ID
     const customerId = typeof paymentIntentData.customer === 'string' 
@@ -30,14 +31,16 @@ export async function extractSubscriptionId(latestCharge: string): Promise<strin
       return null;
     }
 
-    // 4. Récupérer les souscriptions actives du customer
+
+    
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      status: 'active',
       limit: 10
     });
+    console.log("Active subscriptions retrieved:", subscriptions.data);
 
     const targetAmount = paymentIntentData.amount;
+    console.log("Target amount for matching subscription:", targetAmount);
     
     // Essayer de trouver une souscription avec le même montant
     let matchingSubscription = subscriptions.data.find(sub => {

@@ -75,7 +75,8 @@ export async function processPaymentCreationFlow(
 export async function processSubscriptionUpdateFlow(latestCharge: string): Promise<ProcessorResult> {
   const flowType = "Flow 3: Subscription update";
   
-  console.log("Processing Subscription update flow");
+
+
   
   // Extraction uniquement de l'ID de souscription
   const subscriptionId = await extractSubscriptionId(latestCharge);
