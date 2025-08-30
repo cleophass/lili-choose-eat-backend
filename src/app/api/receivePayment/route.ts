@@ -1,4 +1,3 @@
-// src/app/api/receivePayment/route.ts
 import { NextResponse } from "next/server";
 import { 
   type WebhookPayload, 
@@ -96,7 +95,6 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
-
       return NextResponse.json({
         success: true,
         message: "Payment webhook traité avec succès ✅",
