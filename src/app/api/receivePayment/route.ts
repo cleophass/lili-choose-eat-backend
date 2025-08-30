@@ -1,90 +1,10 @@
 // src/app/api/receivePayment/route.ts
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
-
-// Initialisation de Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-08-27.basil",
-});
-
-// Types pour une meilleure type-safety
-interface PaymentData {
-  prenom: string;
-  nom: string;
-  email: string;
-  customerId: string;
-  paymentIntentId: string;
-  invoiceId: string;
-  productDescription: string;
-}
-
-interface WebhookPayload {
-  event_type: string;
-  description?: string;
-  latest_charge?: string;
-}
-
-
-// Fonction pour extraire les données de paiement
-async function extractPaymentData(latestCharge: string): Promise<PaymentData | null> {
-  try {
-    // 1. Récupérer les infos de la charge avec la SDK Stripe
-    const chargeData = await stripe.charges.retrieve(latestCharge);
-    
-    const customerId = typeof chargeData.customer === 'string' ? chargeData.customer : chargeData.customer?.id;
-    const paymentIntentId = typeof chargeData.payment_intent === 'string' ? chargeData.payment_intent : chargeData.payment_intent?.id;
-
-    if (!paymentIntentId) {
-      console.error("Payment Intent ID not found in charge data");
-      return null;
-    }
-
-    // 2. Récupérer les sessions de checkout liées au payment intent
-    const sessions = await stripe.checkout.sessions.list({
-      payment_intent: paymentIntentId,
-      limit: 1,
-    });
-
-    const session = sessions.data[0];
-    if (!session) {
-      console.error("No session found for payment intent");
-      return null;
-    }
-
-    // 3. Extraire les données de manière safe
-    const customFields = session.custom_fields || [];
-    const prenomField = customFields.find((field) => field.key === 'prnom');
-    const nomField = customFields.find((field) => field.key === 'nom');
-    
-    const email = session.customer_details?.email || '';
-    const invoiceId = typeof session.invoice === 'string' ? session.invoice : session.invoice?.id || '';
-
-    // 4. Récupérer les détails de la facture si elle existe
-    let productDescription = '';
-    if (invoiceId) {
-      try {
-        const invoice = await stripe.invoices.retrieve(invoiceId);
-        productDescription = invoice.lines.data[0]?.description || '';
-      } catch (error) {
-        console.error("Failed to fetch invoice data:", error);
-      }
-    }
-
-    return {
-      prenom: prenomField?.text?.value || '',
-      nom: nomField?.text?.value || '',
-      paymentIntentId,
-      email,
-      customerId: customerId || '',
-      invoiceId,
-      productDescription,
-    };
-
-  } catch (error) {
-    console.error("Error extracting payment data:", error);
-    return null;
-  }
-}
+import { 
+  type WebhookPayload, 
+  processPaymentCreationFlow, 
+  processSubscriptionUpdateFlow 
+} from "@/lib/stripe";
 
 export async function POST(req: Request) {
   try {
@@ -120,11 +40,8 @@ export async function POST(req: Request) {
 
     // Traitement selon la description
     const trimmedDescription = description.trim();
-    let paymentData: PaymentData | null = null;
-    let subscriptionId: string | null = null;
-    let flowType: string;
 
-    // Si description vide ou "Subscription creation" -> on récupère les infos
+    // Si description vide ou "Subscription creation" -> processPaymentCreationFlow
     if (trimmedDescription === "" || trimmedDescription === "Subscription creation") {
       
       if (!latest_charge) {
@@ -137,89 +54,69 @@ export async function POST(req: Request) {
         );
       }
 
-      flowType = trimmedDescription === "" 
-        ? "Flow 1: Description vide" 
-        : "Flow 2: Subscription creation";
-
-      console.log(`Processing ${flowType}`);
+      const result = await processPaymentCreationFlow(trimmedDescription, latest_charge);
       
-      // Extraction des données de paiement
-      paymentData = await extractPaymentData(latest_charge);
-      console.log("Données de paiement extraites:", paymentData);
-
-      if (!paymentData) {
+      if (!result.success) {
         return NextResponse.json(
           { 
             success: false,
-            error: "Impossible de récupérer les données de paiement" 
+            error: result.error 
           },
           { status: 500 }
         );
       }
 
-      // Récupération des informations de subscription si invoice existe
-      if (paymentData.invoiceId) {
-        try {
-          const invoiceData = await stripe.invoices.retrieve(paymentData.invoiceId);
-          console.log("Données de la facture extraites:", {
-            subscription: invoiceData.parent?.subscription_details?.subscription,
-            invoice_id: invoiceData.id
-          });
-
-          // Le subscription ID se trouve directement dans invoiceData.parent?.subscription_details
-          const subscription = invoiceData.parent?.subscription_details?.subscription;
-          subscriptionId = typeof subscription === 'string' 
-            ? subscription 
-            : (typeof subscription === 'object' && subscription?.id) || null;
-
-        } catch (error) {
-          console.error("Erreur lors de la récupération de l'invoice:", error);
-        }
-      }
-
-      console.log("Données extraites avec succès:", {
-        prenom: paymentData.prenom,
-        nom: paymentData.nom,
-        email: paymentData.email,
-        customerId: paymentData.customerId,
-        invoiceId: paymentData.invoiceId,
-        productDescription: paymentData.productDescription,
-        subscriptionId,
+      return NextResponse.json({
+        success: true,
+        message: "Payment webhook traité avec succès ✅",
+        flow: result.flowType,
+        data: result.data,
       });
 
     } else if (trimmedDescription === "Subscription update") {
-      flowType = "Flow 3: Subscription update";
-      console.log("Subscription update - pas de traitement pour le moment");
-    } else {
-      flowType = `Flow inconnu: ${trimmedDescription}`;
-      console.log(flowType);
-    }
+      
+      if (!latest_charge) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: "latest_charge requis pour le flow Subscription update" 
+          },
+          { status: 400 }
+        );
+      }
 
-    // Réponse finale
-    return NextResponse.json({
-      success: true,
-      message: "Payment webhook traité avec succès ✅",
-      flow: flowType,
-      data: paymentData ? {
-        payment_intent_id: paymentData.paymentIntentId,
-        customer: {
-          id: paymentData.customerId,
-          prenom: paymentData.prenom,
-          nom: paymentData.nom,
-          email: paymentData.email,
+      const result = await processSubscriptionUpdateFlow(latest_charge);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: result.error 
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Payment webhook traité avec succès ✅",
+        flow: result.flowType,
+        data: result.data,
+      });
+
+    } else {
+      const flowType = `Flow inconnu: ${trimmedDescription}`;
+      console.log(flowType);
+
+      return NextResponse.json({
+        success: true,
+        message: "Payment webhook traité avec succès ✅",
+        flow: flowType,
+        data: {
+          latest_charge,
         },
-        invoice: {
-          id: paymentData.invoiceId,
-          product_description: paymentData.productDescription,
-        },
-        subscription: subscriptionId ? {
-          id: subscriptionId,
-        } : null,
-        charge_id: latest_charge,
-      } : {
-        latest_charge,
-      },
-    });
+      });
+    }
 
   } catch (error) {
     console.error("Erreur dans le webhook:", error);
