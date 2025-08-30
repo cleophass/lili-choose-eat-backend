@@ -1,0 +1,256 @@
+// src/app/api/receivePayment/route.ts
+import { NextResponse } from "next/server";
+
+// Types pour une meilleure type-safety
+interface CustomField {
+  key: string;
+  label: { custom: string; type: string };
+  optional: boolean;
+  text: {
+    default_value: string | null;
+    maximum_length: number | null;
+    minimum_length: number | null;
+    value: string;
+  };
+  type: string;
+}
+
+interface PaymentData {
+  prenom: string;
+  nom: string;
+  email: string;
+  customerId: string;
+  invoiceId: string;
+  productDescription: string;
+}
+
+interface WebhookPayload {
+  payment_intent_id: string;
+  event_type: string;
+  description?: string;
+  customer_id?: string;
+  latest_charge?: string;
+}
+
+// Helper pour récupérer les données de manière safe
+async function fetchStripeData(url: string): Promise<any> {
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Stripe API error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching from Stripe: ${url}`, error);
+    throw error;
+  }
+}
+
+// Fonction pour extraire les données de paiement
+async function extractPaymentData(latestCharge: string): Promise<PaymentData | null> {
+  try {
+    // 1. Récupérer les infos de la charge
+    const chargeData = await fetchStripeData(
+      `https://api.stripe.com/v1/charges/${latestCharge}`
+    );
+    
+    const customerId = chargeData.customer;
+    const paymentIntentId = chargeData.payment_intent;
+
+    if (!paymentIntentId) {
+      console.error("Payment Intent ID not found in charge data");
+      return null;
+    }
+
+    // 2. Récupérer la session de checkout
+    const sessionData = await fetchStripeData(
+      `https://api.stripe.com/v1/checkout/sessions?payment_intent=${paymentIntentId}`
+    );
+
+    const session = sessionData.data?.[0];
+    if (!session) {
+      console.error("No session found for payment intent");
+      return null;
+    }
+
+    // 3. Extraire les données de manière safe
+    const customFields = session.custom_fields || [];
+    const prenomField = customFields.find((field: CustomField) => field.key === 'prnom');
+    const nomField = customFields.find((field: CustomField) => field.key === 'nom');
+    
+    const email = session.customer_details?.email || '';
+    const invoiceId = session.invoice || '';
+
+    // 4. Récupérer les détails de la facture si elle existe
+    let productDescription = '';
+    if (invoiceId) {
+      try {
+        const invoiceData = await fetchStripeData(
+          `https://api.stripe.com/v1/invoices/${invoiceId}`
+        );
+        productDescription = invoiceData.lines?.data?.[0]?.description || '';
+      } catch (error) {
+        console.error("Failed to fetch invoice data:", error);
+      }
+    }
+
+    return {
+      prenom: prenomField?.text?.value || '',
+      nom: nomField?.text?.value || '',
+      email,
+      customerId: customerId || '',
+      invoiceId,
+      productDescription,
+    };
+
+  } catch (error) {
+    console.error("Error extracting payment data:", error);
+    return null;
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    // Parse et validation du body
+    const body: WebhookPayload = await req.json();
+    const {
+      payment_intent_id,
+      event_type,
+      description = '',
+      customer_id,
+      latest_charge,
+    } = body;
+
+    // Validation des champs obligatoires
+    if (!payment_intent_id || !event_type) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: "Champs obligatoires manquants (payment_intent_id, event_type)" 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Vérification du type d'événement
+    if (event_type !== "payment_intent.succeeded") {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: `Event type non supporté: ${event_type}` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Traitement selon la description
+    const trimmedDescription = description.trim();
+    let paymentData: PaymentData | null = null;
+    let flowType: string;
+
+    // Si description vide ou "Subscription creation" -> on récupère les infos
+    if (trimmedDescription === "" || trimmedDescription === "Subscription creation") {
+      
+      if (!latest_charge) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: "latest_charge requis pour ce type de flow" 
+          },
+          { status: 400 }
+        );
+      }
+
+      flowType = trimmedDescription === "" 
+        ? "Flow 1: Description vide" 
+        : "Flow 2: Subscription creation";
+
+      console.log(`Processing ${flowType}`);
+      
+      // Extraction des données de paiement
+      paymentData = await extractPaymentData(latest_charge);
+
+      if (!paymentData) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: "Impossible de récupérer les données de paiement" 
+          },
+          { status: 500 }
+        );
+      }
+
+      console.log("Données extraites avec succès:", {
+        prenom: paymentData.prenom,
+        nom: paymentData.nom,
+        email: paymentData.email,
+        customerId: paymentData.customerId,
+        invoiceId: paymentData.invoiceId,
+        productDescription: paymentData.productDescription,
+      });
+
+    } else if (trimmedDescription === "Subscription update") {
+      flowType = "Flow 3: Subscription update";
+      console.log("Subscription update - pas de traitement pour le moment");
+    } else {
+      flowType = `Flow inconnu: ${trimmedDescription}`;
+      console.log(flowType);
+    }
+
+    // Réponse finale
+    return NextResponse.json({
+      success: true,
+      message: "Payment webhook traité avec succès ✅",
+      flow: flowType,
+      data: paymentData ? {
+        payment_intent_id,
+        customer: {
+          id: paymentData.customerId,
+          prenom: paymentData.prenom,
+          nom: paymentData.nom,
+          email: paymentData.email,
+        },
+        invoice: {
+          id: paymentData.invoiceId,
+          product_description: paymentData.productDescription,
+        },
+        charge_id: latest_charge,
+      } : {
+        payment_intent_id,
+        customer_id,
+        latest_charge,
+      },
+    });
+
+  } catch (error) {
+    console.error("Erreur dans le webhook:", error);
+    
+    // Gestion d'erreur JSON parsing
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: "Body JSON invalide" 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Autres erreurs
+    return NextResponse.json(
+      { 
+        success: false,
+        error: "Erreur interne du serveur",
+        details: error instanceof Error ? error.message : "Erreur inconnue"
+      },
+      { status: 500 }
+    );
+  }
+}
