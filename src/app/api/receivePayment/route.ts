@@ -27,15 +27,17 @@ export async function POST(req: Request) {
     }
 
     // Vérification du type d'événement
-    if (event_type !== "payment_intent.succeeded") {
+    if (event_type !== "payment_intent.succeeded" && event_type !== "payment_intent.payment_failed") {
       return NextResponse.json(
-        { 
-          success: false,
-          error: `Event type non supporté: ${event_type}` 
-        },
-        { status: 400 }
+      { 
+        success: false,
+        error: `Event type non supporté: ${event_type}` 
+      },
+      { status: 400 }
       );
     }
+
+    
 
     // Traitement selon la description
     const trimmedDescription = description.trim();
