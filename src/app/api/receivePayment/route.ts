@@ -1,20 +1,13 @@
 // src/app/api/receivePayment/route.ts
 import { NextResponse } from "next/server";
+import Stripe from "stripe";
+
+// Initialisation de Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-08-27.basil",
+});
 
 // Types pour une meilleure type-safety
-interface CustomField {
-  key: string;
-  label: { custom: string; type: string };
-  optional: boolean;
-  text: {
-    default_value: string | null;
-    maximum_length: number | null;
-    minimum_length: number | null;
-    value: string;
-  };
-  type: string;
-}
-
 interface PaymentData {
   prenom: string;
   nom: string;
@@ -32,49 +25,30 @@ interface WebhookPayload {
   latest_charge?: string;
 }
 
-// Helper pour récupérer les données de manière safe
-async function fetchStripeData(url: string): Promise<any> {
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Stripe API error: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error(`Error fetching from Stripe: ${url}`, error);
-    throw error;
-  }
-}
+// Helper pour récupérer les données de manière safe - DEPRECATED
+// Remplacé par l'utilisation directe de la SDK Stripe
 
 // Fonction pour extraire les données de paiement
 async function extractPaymentData(latestCharge: string): Promise<PaymentData | null> {
   try {
-    // 1. Récupérer les infos de la charge
-    const chargeData = await fetchStripeData(
-      `https://api.stripe.com/v1/charges/${latestCharge}`
-    );
+    // 1. Récupérer les infos de la charge avec la SDK Stripe
+    const chargeData = await stripe.charges.retrieve(latestCharge);
     
-    const customerId = chargeData.customer;
-    const paymentIntentId = chargeData.payment_intent;
+    const customerId = typeof chargeData.customer === 'string' ? chargeData.customer : chargeData.customer?.id;
+    const paymentIntentId = typeof chargeData.payment_intent === 'string' ? chargeData.payment_intent : chargeData.payment_intent?.id;
 
     if (!paymentIntentId) {
       console.error("Payment Intent ID not found in charge data");
       return null;
     }
 
-    // 2. Récupérer la session de checkout
-    const sessionData = await fetchStripeData(
-      `https://api.stripe.com/v1/checkout/sessions?payment_intent=${paymentIntentId}`
-    );
+    // 2. Récupérer les sessions de checkout liées au payment intent
+    const sessions = await stripe.checkout.sessions.list({
+      payment_intent: paymentIntentId,
+      limit: 1,
+    });
 
-    const session = sessionData.data?.[0];
+    const session = sessions.data[0];
     if (!session) {
       console.error("No session found for payment intent");
       return null;
@@ -82,20 +56,18 @@ async function extractPaymentData(latestCharge: string): Promise<PaymentData | n
 
     // 3. Extraire les données de manière safe
     const customFields = session.custom_fields || [];
-    const prenomField = customFields.find((field: CustomField) => field.key === 'prnom');
-    const nomField = customFields.find((field: CustomField) => field.key === 'nom');
+    const prenomField = customFields.find((field) => field.key === 'prnom');
+    const nomField = customFields.find((field) => field.key === 'nom');
     
     const email = session.customer_details?.email || '';
-    const invoiceId = session.invoice || '';
+    const invoiceId = typeof session.invoice === 'string' ? session.invoice : session.invoice?.id || '';
 
     // 4. Récupérer les détails de la facture si elle existe
     let productDescription = '';
     if (invoiceId) {
       try {
-        const invoiceData = await fetchStripeData(
-          `https://api.stripe.com/v1/invoices/${invoiceId}`
-        );
-        productDescription = invoiceData.lines?.data?.[0]?.description || '';
+        const invoice = await stripe.invoices.retrieve(invoiceId);
+        productDescription = invoice.lines.data[0]?.description || '';
       } catch (error) {
         console.error("Failed to fetch invoice data:", error);
       }
