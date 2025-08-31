@@ -21,7 +21,6 @@ export async function processPaymentCreationFlow(
   
   // Extraction des données de paiement
   const paymentData = await extractPaymentData(latestCharge);
-  console.log("Données de paiement extraites:", paymentData);
 
   if (!paymentData) {
     return {

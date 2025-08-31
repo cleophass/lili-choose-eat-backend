@@ -79,7 +79,6 @@ export async function extractPaymentData(latestCharge: string): Promise<PaymentD
     // 1. Récupérer les infos de la charge avec la SDK Stripe
     const chargeData = await stripe.charges.retrieve(latestCharge);
 
-    console.log("Charge data retrieved:", chargeData);
     
     const customerId = typeof chargeData.customer === 'string' 
       ? chargeData.customer 
@@ -100,10 +99,14 @@ export async function extractPaymentData(latestCharge: string): Promise<PaymentD
     });
 
     const session = sessions.data[0];
+
     if (!session) {
       console.error("No session found for payment intent");
       return null;
     }
+
+    const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+    console.log("Line items retrieved:", lineItems.data);
 
     // 3. Extraire les données de manière safe
     const customFields = session.custom_fields || [];
@@ -115,7 +118,7 @@ export async function extractPaymentData(latestCharge: string): Promise<PaymentD
       ? session.invoice 
       : session.invoice?.id || '';
 
-    // 4. Récupérer les détails de la facture si elle existe
+    // 4. Récupérer les détails de la facture si elle existe, sinon depuis les line items
     let productDescription = '';
     if (invoiceId) {
       try {
@@ -123,6 +126,13 @@ export async function extractPaymentData(latestCharge: string): Promise<PaymentD
         productDescription = invoice.lines.data[0]?.description || '';
       } catch (error) {
         console.error("Failed to fetch invoice data:", error);
+      }
+    } else {
+      // Pour les produits uniques, récupérer depuis les line items de la session
+      try {
+        productDescription = lineItems.data[0]?.description || '';
+      } catch (error) {
+        console.error("Failed to fetch line items description:", error);
       }
     }
 
