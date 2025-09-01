@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       }
 
       const result = await processPaymentCreationFlow(trimmedDescription, latest_charge, payment_intent);
-
+      console.log("result",result)
       if (!result.success) {
         return NextResponse.json(
           { 

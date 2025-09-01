@@ -47,6 +47,7 @@ export async function processPaymentCreationFlow(
     productDescription: paymentData.productDescription,
     productId: paymentData.productId,
     subscriptionId,
+    promotionCode:paymentData.promotionCode,
   });
 
   return {
@@ -63,6 +64,7 @@ export async function processPaymentCreationFlow(
         id: paymentData.invoiceId,
         product_description: paymentData.productDescription,
         product_id: paymentData.productId,
+        promotionCode: paymentData.promotionCode,
       },
       subscription: subscriptionId ? {
         id: subscriptionId,

@@ -9,6 +9,7 @@ export interface PaymentData {
   invoiceId: string;
   productDescription: string;
   productId: string;
+  promotionCode: string | null;
 }
 
 export interface WebhookPayload {

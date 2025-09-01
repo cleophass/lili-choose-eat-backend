@@ -90,12 +90,19 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
     });
 
     const session = sessions.data[0];
+    console.log("ssession:",session)
     console.log("Checkout session retrieved:", session);
 
     if (!session) {
       console.error("No session found for payment intent");
       return null;
     }
+
+    // s'il y'a un code promo dans session.discounts.promotion_code le reucperer
+    const promotionCodeData = session.discounts?.[0]?.promotion_code;
+    const promotionCode = typeof promotionCodeData === 'string' 
+      ? promotionCodeData 
+      : promotionCodeData?.id || '';
 
     const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
     console.log("Line items retrieved:", lineItems.data);
@@ -143,7 +150,8 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
       customerId: customerId || '',
       invoiceId,
       productDescription,
-      productId
+      productId,
+      promotionCode
     };
 
   } catch (error) {
