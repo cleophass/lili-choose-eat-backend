@@ -117,8 +117,16 @@ export async function extractPaymentData(latestCharge: string): Promise<PaymentD
     const invoiceId = typeof session.invoice === 'string' 
       ? session.invoice 
       : session.invoice?.id || '';
+    let productId = '';
 
-    // 4. Récupérer les détails de la facture si elle existe, sinon depuis les line items
+    // 4. Récupérer le productId depuis les line items (toujours disponible)
+    try {
+      productId = lineItems.data[0]?.price?.product as string || '';
+    } catch (error) {
+      console.error("Failed to fetch product ID from line items:", error);
+    }
+
+    // 5. Récupérer les détails de la facture si elle existe, sinon depuis les line items
     let productDescription = '';
     if (invoiceId) {
       try {
@@ -144,6 +152,7 @@ export async function extractPaymentData(latestCharge: string): Promise<PaymentD
       customerId: customerId || '',
       invoiceId,
       productDescription,
+      productId
     };
 
   } catch (error) {
