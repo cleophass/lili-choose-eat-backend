@@ -11,7 +11,8 @@ export interface ProcessorResult {
 // Processeur pour les flows 1 & 2 (description vide ou "Subscription creation")
 export async function processPaymentCreationFlow(
   description: string, 
-  latestCharge: string
+  latestCharge: string,
+  payment_intent: string
 ): Promise<ProcessorResult> {
   const flowType = description === "" 
     ? "Flow 1: Description vide" 
@@ -20,7 +21,7 @@ export async function processPaymentCreationFlow(
   console.log(`Processing ${flowType}`);
   
   // Extraction des données de paiement
-  const paymentData = await extractPaymentData(latestCharge);
+  const paymentData = await extractPaymentData(latestCharge,payment_intent);
 
   if (!paymentData) {
     return {
@@ -52,7 +53,6 @@ export async function processPaymentCreationFlow(
     success: true,
     flowType,
     data: {
-      payment_intent_id: paymentData.paymentIntentId,
       customer: {
         id: paymentData.customerId,
         prenom: paymentData.prenom,

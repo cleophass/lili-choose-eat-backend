@@ -6,7 +6,6 @@ export interface PaymentData {
   nom: string;
   email: string;
   customerId: string;
-  paymentIntentId: string;
   invoiceId: string;
   productDescription: string;
   productId: string;
@@ -16,4 +15,5 @@ export interface WebhookPayload {
   event_type: string;
   description?: string;
   latest_charge?: string;
+  payment_intent?: string;
 }

@@ -13,6 +13,7 @@ export async function POST(req: Request) {
       event_type,
       description = '',
       latest_charge,
+      payment_intent
     } = body;
 
     // Validation des champs obligatoires
@@ -55,8 +56,18 @@ export async function POST(req: Request) {
         );
       }
 
-      const result = await processPaymentCreationFlow(trimmedDescription, latest_charge);
-      
+      if (!payment_intent) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: "payment_intent requis pour ce type de flow" 
+          },
+          { status: 400 }
+        );
+      }
+
+      const result = await processPaymentCreationFlow(trimmedDescription, latest_charge, payment_intent);
+
       if (!result.success) {
         return NextResponse.json(
           { 

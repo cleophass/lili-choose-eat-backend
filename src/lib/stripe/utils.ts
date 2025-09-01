@@ -74,31 +74,23 @@ export async function extractSubscriptionId(latestCharge: string): Promise<strin
 }
 
 // Fonction pour extraire les données de paiement
-export async function extractPaymentData(latestCharge: string): Promise<PaymentData | null> {
+export async function extractPaymentData(latestCharge: string, payment_intent: string): Promise<PaymentData | null> {
   try {
     // 1. Récupérer les infos de la charge avec la SDK Stripe
     const chargeData = await stripe.charges.retrieve(latestCharge);
+    console.log("Charge data retrieved:", chargeData);
 
-    
     const customerId = typeof chargeData.customer === 'string' 
       ? chargeData.customer 
       : chargeData.customer?.id;
-    const paymentIntentId = typeof chargeData.payment_intent === 'string' 
-      ? chargeData.payment_intent 
-      : chargeData.payment_intent?.id;
-
-    if (!paymentIntentId) {
-      console.error("Payment Intent ID not found in charge data");
-      return null;
-    }
-
-    // 2. Récupérer les sessions de checkout liées au payment intent
+  
     const sessions = await stripe.checkout.sessions.list({
-      payment_intent: paymentIntentId,
+      payment_intent: payment_intent,
       limit: 1,
     });
 
     const session = sessions.data[0];
+    console.log("Checkout session retrieved:", session);
 
     if (!session) {
       console.error("No session found for payment intent");
@@ -147,7 +139,6 @@ export async function extractPaymentData(latestCharge: string): Promise<PaymentD
     return {
       prenom: prenomField?.text?.value || '',
       nom: nomField?.text?.value || '',
-      paymentIntentId,
       email,
       customerId: customerId || '',
       invoiceId,
