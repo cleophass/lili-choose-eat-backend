@@ -1,6 +1,6 @@
-// src/lib/stripe/utils.ts
-import { stripe } from "./config";
-import { PaymentData } from "./types";
+// src/lib/promo/utils.ts
+import { stripe } from "../stripe/config";
+import { PaymentData } from "../stripe/types";
 
 // Fonction pour extraire uniquement l'ID de souscription
 export async function extractSubscriptionId(latestCharge: string): Promise<string | null> {
