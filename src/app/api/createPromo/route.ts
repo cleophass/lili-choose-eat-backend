@@ -7,11 +7,34 @@ import { createPromoCodeWithCoupon } from "@/lib/stripe/promo";
 
 export async function POST(req: Request) {
   try {
-    // Parse et validation du body
-    const body: PromoPayload = await req.json();
-    const {
-        email
-    } = body;
+    // Détecter le type de contenu et parser en conséquence
+    const contentType = req.headers.get('content-type') || '';
+    let body: PromoPayload;
+
+    if (contentType.includes('application/json')) {
+      // Données JSON (si envoyées depuis une API)
+      body = await req.json();
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Données de formulaire Webflow
+      const formData = await req.formData();
+      body = {
+        email: formData.get('email') as string || ''
+      };
+    } else {
+      // Fallback: essayer de parser comme form data
+      const text = await req.text();
+      console.log('Raw body received:', text);
+      
+      // Parser manuellement les données URL-encoded
+      const params = new URLSearchParams(text);
+      body = {
+        email: params.get('email') || ''
+      };
+    }
+
+    console.log('Parsed body:', body);
+
+    const { email } = body;
 
     // Validation des champs obligatoires
     if (!email) {
