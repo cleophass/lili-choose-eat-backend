@@ -6,5 +6,5 @@ export interface PaymentData {
 }
 
 export interface PromoPayload {
-  email_parrain:string;
+  email:string;
 }
