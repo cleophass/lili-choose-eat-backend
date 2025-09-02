@@ -10,15 +10,15 @@ export async function POST(req: Request) {
     // Parse et validation du body
     const body: PromoPayload = await req.json();
     const {
-        email
+        email_parrain
     } = body;
 
     // Validation des champs obligatoires
-    if (!email) {
+    if (!email_parrain) {
       return NextResponse.json(
         { 
           success: false,
-          error: "Champs obligatoires manquants (email)" 
+          error: "Champs obligatoires manquants (email_parrain)" 
         },
         { status: 400 }
       );
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     // Query Airtable pour voir si l'utilisateur existe
     const records = await base('Clients').select({
-      filterByFormula: `{Email} = "${email}"`,
+      filterByFormula: `{Email} = "${email_parrain}"`,
       maxRecords: 1
     }).firstPage();
     console.log("records:", records);
