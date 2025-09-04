@@ -67,7 +67,8 @@ export async function POST(req: Request) {
     const user = records[0];
     
     // Vérifier que l'utilisateur a un "suivi en cours"
-    const suiviEnCours = user.get('Suivi en cours (champ auto)');
+    const suiviEnCours = user.get('Suivi en cours ?');
+    console.log("suiviEnCours:", suiviEnCours);
     if (!suiviEnCours) {
       return NextResponse.json(
         { 
