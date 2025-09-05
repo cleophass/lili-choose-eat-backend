@@ -7,33 +7,8 @@ import { createPromoCodeWithCoupon } from "@/lib/stripe/promo";
 
 export async function POST(req: Request) {
   try {
-    // Détecter le type de contenu et parser en conséquence
-    const contentType = req.headers.get('content-type') || '';
-    let body: PromoPayload;
-
-    if (contentType.includes('application/json')) {
-      // Données JSON (si envoyées depuis une API)
-      body = await req.json();
-    } else if (contentType.includes('application/x-www-form-urlencoded')) {
-      // Données de formulaire Webflow
-      const formData = await req.formData();
-      body = {
-        email: formData.get('email') as string || ''
-      };
-    } else {
-      // Fallback: essayer de parser comme form data
-      const text = await req.text();
-      console.log('Raw body received:', text);
-      
-      // Parser manuellement les données URL-encoded
-      const params = new URLSearchParams(text);
-      body = {
-        email: params.get('email') || ''
-      };
-    }
-
-    console.log('Parsed body:', body);
-
+    // Parse et validation du body
+    const body: PromoPayload = await req.json();
     const { email } = body;
 
     // Validation des champs obligatoires
@@ -46,6 +21,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+
 
     // Query Airtable pour voir si l'utilisateur existe
     const records = await base('Clients').select({
@@ -66,18 +43,7 @@ export async function POST(req: Request) {
 
     const user = records[0];
     
-    // Vérifier que l'utilisateur a un "suivi en cours"
-    const suiviEnCours = user.get('Suivi en cours ?');
-    console.log("suiviEnCours:", suiviEnCours);
-    if (!suiviEnCours) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: "L'utilisateur n'a pas de suivi en cours" 
-        },
-        { status: 400 }
-      );
-    }
+   
 
 
     // Vérifier que l'utilisateur n'a pas déjà un code parainage
