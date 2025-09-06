@@ -90,7 +90,6 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
     });
 
     const session = sessions.data[0];
-    console.log("ssession:",session)
     console.log("Checkout session retrieved:", session);
 
     if (!session) {
@@ -151,7 +150,12 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
       invoiceId,
       productDescription,
       productId,
-      promotionCode
+      promotionCode,
+      rue: '',
+      ville: '',
+      codePostal: '',
+      country: '',
+      telephone: ''
     };
 
   } catch (error) {

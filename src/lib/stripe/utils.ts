@@ -90,7 +90,6 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
     });
 
     const session = sessions.data[0];
-    console.log("ssession:",session)
     console.log("Checkout session retrieved:", session);
 
     if (!session) {
@@ -116,6 +115,15 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
     const invoiceId = typeof session.invoice === 'string' 
       ? session.invoice 
       : session.invoice?.id || '';
+    
+    // 4. Extraire les informations d'adresse et téléphone
+    const address = session.customer_details?.address;
+    const rue = address?.line1 || '';
+    const ville = address?.city || '';
+    const codePostal = address?.postal_code || '';
+    const country = address?.country || '';
+    const telephone = session.customer_details?.phone || '';
+    
     let productId = '';
 
     // 4. Récupérer le productId depuis les line items (toujours disponible)
@@ -151,7 +159,12 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
       invoiceId,
       productDescription,
       productId,
-      promotionCode
+      promotionCode,
+      rue,
+      ville,
+      codePostal,
+      country,
+      telephone
     };
 
   } catch (error) {

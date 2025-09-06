@@ -47,7 +47,12 @@ export async function processPaymentCreationFlow(
     productDescription: paymentData.productDescription,
     productId: paymentData.productId,
     subscriptionId,
-    promotionCode:paymentData.promotionCode,
+    promotionCode: paymentData.promotionCode,
+    rue: paymentData.rue,
+    ville: paymentData.ville,
+    codePostal: paymentData.codePostal,
+    country: paymentData.country,
+    telephone: paymentData.telephone,
   });
 
   return {
@@ -59,6 +64,11 @@ export async function processPaymentCreationFlow(
         prenom: paymentData.prenom,
         nom: paymentData.nom,
         email: paymentData.email,
+        rue: paymentData.rue,
+        ville: paymentData.ville,
+        codePostal: paymentData.codePostal,
+        country: paymentData.country,
+        telephone: paymentData.telephone,
       },
       invoice: {
         id: paymentData.invoiceId,

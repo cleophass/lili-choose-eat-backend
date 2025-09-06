@@ -10,6 +10,11 @@ export interface PaymentData {
   productDescription: string;
   productId: string;
   promotionCode: string | null;
+  rue: string;
+  ville: string;
+  codePostal: string;
+  country: string;
+  telephone: string;
 }
 
 export interface WebhookPayload {
