@@ -180,3 +180,31 @@ export async function getSubscriptionIdFromInvoice(invoiceId: string): Promise<s
     return null;
   }
 }
+
+/**
+ * Normalise un nom pour qu'il soit compatible avec les codes promo Stripe
+ * - Supprime les accents
+ * - Remplace les espaces par des tirets
+ * - Supprime les caractères spéciaux non autorisés
+ * - Garde seulement les lettres, chiffres, tirets et underscores
+ * @param name Le nom à normaliser
+ * @returns Le nom normalisé
+ */
+export function normalizeNameForPromoCode(name: string): string {
+  if (!name) return '';
+  
+  // Supprimer les accents
+  const withoutAccents = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  // Remplacer les espaces par des tirets
+  const withDashes = withoutAccents.replace(/\s+/g, '-');
+  
+  // Garder seulement les caractères autorisés : lettres, chiffres, tirets et underscores
+  const sanitized = withDashes.replace(/[^a-zA-Z0-9\-_]/g, '');
+  
+  // Supprimer les tirets multiples consécutifs
+  const cleanDashes = sanitized.replace(/-+/g, '-');
+  
+  // Supprimer les tirets en début et fin
+  return cleanDashes.replace(/^-+|-+$/g, '');
+}

@@ -7,4 +7,5 @@ export interface PaymentData {
 
 export interface PromoPayload {
   email:string;
+  paymentId: string;
 }
