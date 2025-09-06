@@ -48,13 +48,13 @@ export async function POST(req: Request) {
     // Vérifier que l'utilisateur n'a pas déjà un code parainage
     const existingPromoCode = user.get('Code parrainage');
     if (existingPromoCode) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: "L'utilisateur a déjà un Code parrainage" 
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: true,
+        message: "Code promo existant trouvé",
+        userId: user.id,
+        promoCode: existingPromoCode,
+        isExisting: true
+      });
     }
 
     const prenom = user.get('Prénom') || '';
@@ -173,6 +173,7 @@ export async function POST(req: Request) {
       message: "Code promo généré avec succès",
       userId: user.id,
       promoCode: promoCode,
+      isExisting: false,
       promoDetails: {
         id: promoResult.promoCode?.id,
         couponId: promoResult.promoCode?.coupon.id,
