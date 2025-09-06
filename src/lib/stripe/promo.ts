@@ -48,7 +48,6 @@ export async function createPromoCodeWithCoupon(
       coupon: coupon.id,
       code: code,
       expires_at: Math.floor(expiresAt.getTime() / 1000), // Convertir en timestamp Unix
-      max_redemptions: 1
     });
 
     return {
