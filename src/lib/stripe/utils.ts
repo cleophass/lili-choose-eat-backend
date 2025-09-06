@@ -145,7 +145,7 @@ export async function extractPaymentData(latestCharge: string, payment_intent: s
 
     return {
       prenom: prenomField?.text?.value || '',
-      nom: nomField?.text?.value || '',
+      nom: (nomField?.text?.value || '').toUpperCase(),
       email,
       customerId: customerId || '',
       invoiceId,

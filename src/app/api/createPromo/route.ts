@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-
 import { base } from "@/lib/airtable/utils";
-import { sendPromoCodeEmail } from "@/lib/brevo";
 import { PromoPayload } from "@/lib/promo/types";
 import { createPromoCodeWithCoupon } from "@/lib/stripe/promo";
 
@@ -104,17 +102,6 @@ export async function POST(req: Request) {
       }
     }]);
 
-    // Récupérer le prénom s'il existe dans Airtable
-    const prenom = user.get('Prénom') || user.get('Prenom') || user.get('prenom');
-
-    // // Envoyer le code par email avec Brevo
-    // const emailResult = await sendPromoCodeEmail(email, promoCode, prenom as string);
-    
-    // if (!emailResult.success) {
-    //   console.error("Erreur envoi email:", emailResult.error);
-    //   // On continue même si l'email échoue, le code est déjà créé
-    // }
-    // console.log("Email envoyé avec succès:", emailResult);
 
 
     return NextResponse.json({
